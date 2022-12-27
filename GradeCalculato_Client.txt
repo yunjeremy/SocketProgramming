@@ -1,0 +1,65 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+void error_handling(char *message);
+
+int main(int argc, char* argv[])
+{
+
+   int kor, eng, mat; //과목 선언
+   
+   int sock;
+   struct sockaddr_in serv_addr;
+   char message[30];
+   int str_len;
+
+   int answer; //server에서 오는 답변 받는 변수 선언
+   
+   if(argc!=3)
+   {
+      printf("Usage : %s <IP> <port>\n", argv[0]);
+      exit(1);
+   }
+   
+   sock=socket(PF_INET, SOCK_STREAM, 0);
+   if(sock == -1)
+      error_handling("socket() error");
+
+   memset(&serv_addr, 0, sizeof(serv_addr));
+   serv_addr.sin_family=AF_INET;
+   serv_addr.sin_addr.s_addr=inet_addr(argv[1]);
+   serv_addr.sin_port=htons(atoi(argv[2]));
+
+   if(connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr))==-1)
+      error_handling("connect() error!");
+
+
+   printf("국어 점수 입력 : "); //점수 입력
+   scanf("%d", &kor);
+   printf("영어 점수 입력 : ");
+   scanf("%d", &eng);
+   printf("수학 점수 입력 : ");
+   scanf("%d", &mat);
+
+   write(sock, &kor, sizeof(kor)); //점수 server에 보내기
+   write(sock, &eng, sizeof(eng));
+   write(sock, &mat, sizeof(mat));
+
+   str_len=read(sock, &answer, sizeof(answer)); //server에서 온 데이터 받기
+   if(str_len==-1)
+      error_handling("read() error!");
+
+   printf("Message from server : %c \n", answer); //학점 출력
+   close(sock);
+   return 0;
+}
+
+void error_handling(char *message)
+{
+   fputs(message, stderr);
+   fputc('\n', stderr);
+   exit(1);
+}

@@ -1,0 +1,105 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <pthread.h>
+#define BUF_SIZE 100
+#define NAME_SIZE 20
+void * send_msg(void * arg);
+void * recv_msg(void * arg);
+void error_handling(char * msg);
+char name[NAME_SIZE]="[DEFAULT]";
+char msg[BUF_SIZE];
+char *nameList[10]; // 이름 저장 리스트
+int cntName =0;// 이름 카운트
+int main(int argc, char *argv[])
+{
+int sock;
+struct sockaddr_in serv_addr;
+pthread_t snd_thread, rcv_thread;
+void * thread_return;
+for(int i=0; i<10; i++) // 이름 메모리 할당
+{
+nameList[i] = malloc(sizeof(char)*100);
+}
+if(argc!=4) {
+printf("Usage : %s <IP> <port> <name>\n", argv[0]);
+exit(1);
+}
+sprintf(name, "[%s]", argv[3]);
+sock=socket(PF_INET, SOCK_STREAM, 0);
+memset(&serv_addr, 0, sizeof(serv_addr));
+serv_addr.sin_family=AF_INET;
+serv_addr.sin_addr.s_addr=inet_addr(argv[1]);
+serv_addr.sin_port=htons(atoi(argv[2]));
+
+if(connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr))==-1)
+error_handling("connect() error");
+write(sock, &name, sizeof(char)*100); // 이름 보내기
+read(sock, &cntName, sizeof(cntName)); // 이름 카운트 수신
+for(int i=0; i<cntName-1; i++) // for문 카운트 마지막 전꺼 까지
+{
+read(sock, nameList[i], sizeof(char)*100); // 이름 리스
+트 수신
+printf("%s, ", nameList[i]); // 이름 출력
+}
+read(sock, nameList[cntName-1], sizeof(char)*100); // 카운트 마지막꺼 수
+신
+printf("%s ( 총 %d명) \n", nameList[cntName-1], cntName);
+printf("%s님이 새로 접속했습니다. \n", name);
+pthread_create(&snd_thread, NULL, send_msg, (void*)&sock);
+pthread_create(&rcv_thread, NULL, recv_msg, (void*)&sock);
+pthread_join(snd_thread, &thread_return);
+pthread_join(rcv_thread, &thread_return);
+close(sock);
+return 0;
+}
+void * send_msg(void * arg) // send thread main
+{
+int sock=*((int*)arg);
+char name_msg[NAME_SIZE+BUF_SIZE];
+while(1)
+{
+fgets(msg, BUF_SIZE, stdin);
+if(!strcmp(msg,"q\n")||!strcmp(msg,"Q\n"))
+{
+printf("%s님이 접속을 종료했습니다. \n", name);
+close(sock);
+exit(0);
+}
+if(!strcmp(msg,"@\n")) // @ 누르면 현재 접속중인 이름, 인원 출력
+{
+for(int i=0; i<cntName-1; i++)
+{
+printf("%s, ", nameList[i]);
+}
+printf("%s ( 총 %d명) \n", nameList[cntName-1], cntName);
+}
+sprintf(name_msg,"%s %s", name, msg);
+write(sock, name_msg, strlen(name_msg));
+}
+return NULL;
+}
+void * recv_msg(void * arg) // read thread main
+{
+int sock=*((int*)arg);
+char name_msg[NAME_SIZE+BUF_SIZE];
+int str_len;
+while(1)
+{
+str_len=read(sock, name_msg, NAME_SIZE+BUF_SIZE-1);
+if(str_len==-1)
+return (void*)-1;
+name_msg[str_len]=0;
+fputs(name_msg, stdout);
+}
+return NULL;
+}
+void error_handling(char *msg)
+{
+fputs(msg, stderr);
+fputc('\n', stderr);
+exit(1);
+}

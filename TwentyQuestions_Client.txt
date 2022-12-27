@@ -1,0 +1,65 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <windows.h>
+void error_handling(char *message);
+int main(int argc, char* argv[])
+{
+ int sock;
+ struct sockaddr_in serv_addr;
+ char message[30];
+ char answer[100];
+ char end[30];
+ int str_len;
+ int num;
+ int i = 0;
+ int ing;
+
+ if(argc!=3)
+ {
+ printf("Usage : %s <IP> <port>\n", argv[0]);
+ exit(1);
+ }
+
+ sock=socket(PF_INET, SOCK_STREAM, 0);
+ if(sock == -1)
+ error_handling("socket() error");
+ memset(&serv_addr, 0, sizeof(serv_addr));
+ serv_addr.sin_family=AF_INET;
+ serv_addr.sin_addr.s_addr=inet_addr(argv[1]);
+ serv_addr.sin_port=htons(atoi(argv[2]));
+ if(connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr))==-1)
+ error_handling("connect() error!");
+ str_len=read(sock, message, sizeof(message)-1);
+ if(str_len==-1)
+ error_handling("read() error!");
+ printf("%s \n", message); // Game Start
+ while(i<20) // 20번 반복
+ {
+ printf("1~50 사이의 정수를 입력하세요: ");
+ scanf("%d", &num);
+ write(sock, &num, sizeof(num)); // 입력한 수 server에 전송
+ read(sock, &ing, sizeof(ing)); // 정답인지 확인하는 메세지 수신
+ read(sock, answer, sizeof(answer)-1); // 정답과 비교 수신
+ printf("%s \n", answer);
+ if (ing==1)
+ break; // 정답이면 while문 탈출
+ i++;
+ if(i==20)
+ printf("숫자 맞추기 실패\n");
+ }
+ Sleep(100); // 대기 없으면 end메세지 오류
+ read(sock, end, sizeof(end)-1); // end 메세지 수신
+ printf("%s \n", end);
+ close(sock);
+ return 0;
+}
+void error_handling(char *message)
+{
+ fputs(message, stderr);
+ fputc('\n', stderr);
+ exit(1);
+}
